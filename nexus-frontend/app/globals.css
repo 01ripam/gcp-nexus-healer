@@ -1,0 +1,45 @@
+:root {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --primary: #10b981;
+  --border: #27272a;
+  --card: #111113;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  margin: 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.glass-card {
+  background: var(--card);
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.badge-healthy { background: #064e3b33; color: #34d399; border-color: #064e3b; }
+.badge-corrupted { background: #7f1d1d33; color: #f87171; border-color: #7f1d1d; }
+.badge-repaired { background: #1e3a8a33; color: #60a5fa; border-color: #1e3a8a; }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
