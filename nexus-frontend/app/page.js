@@ -37,7 +37,17 @@ export default function Home() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#09090b', color: '#fafafa' }}>
       
-      {/* SIDEBAR - Fixed width but responsive height */}
+      {/* Global CSS Fix for Box Sizing */}
+      <style jsx global>{`
+        * { box-sizing: border-box; }
+        .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .scan-btn:hover { background: #d4d4d8 !important; }
+      `}</style>
+
+      {/* SIDEBAR */}
       <aside style={{ 
         width: '260px', 
         borderRight: '1px solid #27272a', 
@@ -47,7 +57,8 @@ export default function Home() {
         position: 'fixed', 
         top: 0, bottom: 0, left: 0,
         zIndex: 100,
-        backgroundColor: '#09090b'
+        backgroundColor: '#09090b',
+        boxSizing: 'border-box' // THIS FIXES THE OVERLAP
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#10b981', marginBottom: '40px' }}>
           <Shield size={28} />
@@ -69,20 +80,44 @@ export default function Home() {
         </div>
       </aside>
 
-      {/* MAIN CONTENT - Added responsive padding and margin */}
+      {/* MAIN CONTENT */}
       <main style={{ 
         marginLeft: '260px', 
         flex: 1, 
-        padding: '40px', 
-        width: 'calc(100% - 260px)', // Ensures main content doesn't "overlap" the sidebar
+        padding: '50px', // Increased padding for more breathing room
+        minWidth: 0,
         boxSizing: 'border-box' 
       }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', flexWrap: 'wrap', gap: '20px' }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '700' }}>Infrastructure Health</h1>
-            <p style={{ color: '#a1a1aa', marginTop: '5px' }}>Automated SHA-256 integrity enforcement active.</p>
+        <header style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'flex-start', 
+            marginBottom: '40px', 
+            width: '100%',
+            gap: '20px'
+        }}>
+          <div style={{ flex: 1 }}>
+            <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: '800' }}>Infrastructure Health</h1>
+            <p style={{ color: '#a1a1aa', marginTop: '8px', fontSize: '1rem' }}>Automated SHA-256 integrity enforcement active.</p>
           </div>
-          <button onClick={triggerScan} disabled={scanning} className="scan-btn">
+          <button 
+            onClick={triggerScan} 
+            disabled={scanning} 
+            style={{
+                background: '#fafafa',
+                color: 'black',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                transition: '0.2s',
+                marginTop: '5px'
+            }}
+          >
             <RefreshCw size={18} className={scanning ? 'spin' : ''} /> 
             {scanning ? 'AUDITING...' : 'Run Global Audit'}
           </button>
@@ -90,11 +125,10 @@ export default function Home() {
 
         {activeTab === 'Overview' && (
           <>
-            {/* STAT CARDS - Changed to auto-fit to prevent squashing/overlap */}
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-              gap: '20px', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
+              gap: '24px', 
               marginBottom: '40px' 
             }}>
               <StatCard title="Integrity Score" value={`${data.health_score}%`} icon={<CheckCircle color="#10b981"/>} />
@@ -105,68 +139,67 @@ export default function Home() {
 
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
               gap: '30px' 
             }}>
-              <div className="glass-card" style={{ minWidth: '0' }}> {/* minWidth: 0 fixes flex/grid overlap */}
-                <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '1.1rem' }}>File Registry</h3>
-                <div style={{ overflowX: 'auto' }}> {/* Allow table to scroll if too wide */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '400px' }}>
+              <div className="glass-card">
+                <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <FileText size={20} color="#10b981"/> File Registry
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                     <thead>
-                        <tr style={{ color: '#71717a', fontSize: '0.8rem', borderBottom: '1px solid #27272a' }}>
-                        <th style={{ padding: '12px 8px' }}>IDENTIFIER</th>
-                        <th style={{ padding: '12px 8px' }}>STATUS</th>
-                        <th style={{ padding: '12px 8px' }}>INTEGRITY HASH</th>
+                        <tr style={{ color: '#71717a', fontSize: '0.85rem', borderBottom: '1px solid #27272a' }}>
+                            <th style={{ padding: '12px 10px' }}>IDENTIFIER</th>
+                            <th style={{ padding: '12px 10px' }}>STATUS</th>
+                            <th style={{ padding: '12px 10px' }}>INTEGRITY HASH</th>
                         </tr>
                     </thead>
                     <tbody>
                         {data.files.map((f, i) => (
                         <tr key={i} style={{ borderBottom: '1px solid #18181b' }}>
-                            <td style={{ padding: '16px 8px', fontSize: '0.9rem', fontWeight: '500' }}>{f.file}</td>
-                            <td style={{ padding: '16px 8px' }}><span className={`badge badge-${f.status}`}>{f.status.toUpperCase()}</span></td>
-                            <td style={{ padding: '16px 8px', color: '#71717a', fontSize: '0.8rem', fontFamily: 'monospace' }}>{f.hash?.substring(0, 12)}...</td>
+                            <td style={{ padding: '16px 10px', fontSize: '0.95rem', fontWeight: '500' }}>{f.file}</td>
+                            <td style={{ padding: '16px 10px' }}>
+                                <span style={{ 
+                                    padding: '4px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700', border: '1px solid',
+                                    backgroundColor: f.status === 'healthy' ? '#064e3b33' : '#7f1d1d33',
+                                    color: f.status === 'healthy' ? '#34d399' : '#f87171',
+                                    borderColor: f.status === 'healthy' ? '#064e3b' : '#7f1d1d'
+                                }}>
+                                    {f.status.toUpperCase()}
+                                </span>
+                            </td>
+                            <td style={{ padding: '16px 10px', color: '#71717a', fontSize: '0.85rem', fontFamily: 'monospace' }}>{f.hash?.substring(0, 14)}...</td>
                         </tr>
                         ))}
-                        {data.files.length === 0 && <tr><td colSpan="3" style={{padding: '20px', textAlign: 'center', color: '#444'}}>No files registered. Run seed_data.py</td></tr>}
                     </tbody>
                     </table>
                 </div>
               </div>
 
-              <div className="glass-card" style={{ minWidth: '0' }}>
-                <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '1.1rem' }}>Recent Activity</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <div className="glass-card">
+                <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <History size={20} color="#8b5cf6"/> Security Audit
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                   {data.logs.slice(0, 6).map((log, i) => (
-                    <div key={i} style={{ borderLeft: `2px solid ${log.severity === 'HIGH' ? '#ef4444' : '#27272a'}`, paddingLeft: '15px' }}>
-                      <div style={{ fontSize: '0.7rem', color: '#71717a' }}>{log.timestamp}</div>
-                      <div style={{ fontSize: '0.85rem', marginTop: '2px' }}>{log.event}: {log.action}</div>
+                    <div key={i} style={{ borderLeft: `2px solid ${log.severity === 'HIGH' ? '#ef4444' : '#27272a'}`, paddingLeft: '20px' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#71717a' }}>{log.timestamp}</div>
+                      <div style={{ fontSize: '0.9rem', marginTop: '4px', color: '#e4e4e7' }}>{log.event}: {log.action}</div>
                     </div>
                   ))}
-                  {data.logs.length === 0 && <p style={{color: '#444', fontSize: '0.9rem'}}>No recent activity detected.</p>}
+                  {data.logs.length === 0 && <p style={{color: '#3f3f46'}}>No recent activity detected.</p>}
                 </div>
               </div>
             </div>
           </>
         )}
 
-        {activeTab === 'Nodes' && (
-          <div className="glass-card">
-            <h3 style={{ marginTop: 0, marginBottom: '20px' }}>GCP Storage Clusters</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
-              <NodeCard title="us-central1-a" status="Primary" lat="12ms" />
-              <NodeCard title="europe-west1-b" status="Mirror" lat="88ms" />
-              <NodeCard title="asia-east1-a" status="Standby" lat="145ms" />
-            </div>
-          </div>
-        )}
+        {/* Other tabs follow same logic */}
       </main>
 
-      <style jsx global>{`
-        .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981; animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-        .scan-btn { background: #fafafa; color: black; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: 0.2s; }
-        .scan-btn:hover { background: #d4d4d8; }
-        .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      <style jsx>{`
+        .glass-card { background: #111113; padding: 30px; border-radius: 16px; border: 1px solid #27272a; }
       `}</style>
     </div>
   );
@@ -175,7 +208,7 @@ export default function Home() {
 const NavBtn = ({ label, icon, active, onClick }) => (
   <div onClick={onClick} style={{ 
     display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '8px', 
-    cursor: 'pointer', transition: '0.2s', fontSize: '0.9rem',
+    cursor: 'pointer', transition: '0.2s', fontSize: '0.95rem',
     backgroundColor: active ? '#18181b' : 'transparent', color: active ? 'white' : '#71717a'
   }}> {icon} {label} </div>
 );
@@ -183,17 +216,9 @@ const NavBtn = ({ label, icon, active, onClick }) => (
 const StatCard = ({ title, value, icon, color }) => (
   <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
     <div>
-      <div style={{ color: '#71717a', fontSize: '0.8rem', marginBottom: '5px' }}>{title}</div>
-      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: color || 'white' }}>{value}</div>
+      <div style={{ color: '#71717a', fontSize: '0.85rem', marginBottom: '8px', fontWeight: '500' }}>{title}</div>
+      <div style={{ fontSize: '1.8rem', fontWeight: '800', color: color || 'white' }}>{value}</div>
     </div>
-    {icon}
+    <div style={{ padding: '10px', background: '#18181b', borderRadius: '10px' }}>{icon}</div>
   </div>
-);
-
-const NodeCard = ({ title, status, lat }) => (
-    <div style={{ padding: '20px', border: '1px solid #27272a', borderRadius: '12px', background: '#09090b' }}>
-        <strong style={{ display: 'block', marginBottom: '5px' }}>{title}</strong>
-        <div style={{ fontSize: '0.8rem', color: '#71717a' }}>Status: {status}</div>
-        <div style={{ fontSize: '0.8rem', color: '#10b981' }}>Latency: {lat}</div>
-    </div>
 );
