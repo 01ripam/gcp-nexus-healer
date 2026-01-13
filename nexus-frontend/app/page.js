@@ -1,183 +1,121 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Activity, RefreshCw, FileText, CheckCircle, AlertCircle, HardDrive, History, Lock, Server, Globe, Database } from 'lucide-react';
+import { 
+  Shield, Activity, RefreshCw, FileText, CheckCircle, 
+  AlertCircle, Cpu, History, Globe, Database, Server, 
+  Layers, HardDrive, ShieldCheck
+} from 'lucide-react';
 import axios from 'axios';
 
-const API_BASE = "http://localhost:5000/api";
-
 export default function Home() {
-  const [data, setData] = useState({ files: [], logs: [], health_score: 100, repair_total: 0, system_status: 'STABLE' });
+  const [data, setData] = useState({ files: [], logs: [], health_score: 100, repair_total: 0, insight: "" });
   const [scanning, setScanning] = useState(false);
   const [activeTab, setActiveTab] = useState('Overview');
   const [mounted, setMounted] = useState(false);
+  const [apiUrl, setApiUrl] = useState("");
 
   useEffect(() => {
     setMounted(true);
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+    const host = window.location.hostname;
+    setApiUrl(`http://${host}:5000/api`);
   }, []);
 
-  const fetchData = async () => {
+  useEffect(() => {
+    if (apiUrl) {
+      refreshData();
+      const interval = setInterval(fetchStats, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [apiUrl]);
+
+  const fetchStats = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/dashboard-stats`);
-      setData(res.data);
-    } catch (err) { console.error("Sentinel API Offline"); }
+      const res = await axios.get(`${apiUrl}/dashboard-stats`);
+      const ai = await axios.get(`${apiUrl}/ai-insights`);
+      setData(prev => ({ ...prev, ...res.data, insight: ai.data.insight }));
+    } catch (e) { console.warn("Backend Syncing..."); }
   };
+
+  const refreshData = () => fetchStats();
 
   const triggerScan = async () => {
     setScanning(true);
-    try { await axios.post(`${API_BASE}/scan`); fetchData(); } catch (err) { }
-    setTimeout(() => setScanning(false), 800);
+    try {
+      await axios.post(`${apiUrl}/scan`);
+      await fetchStats();
+    } catch (e) {
+      alert("Error connecting to Python backend!");
+    }
+    setScanning(false);
   };
 
   if (!mounted) return null;
 
-  // --- TAB CONTENT RENDERERS ---
-
-  const renderOverview = () => (
-    <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '24px', marginBottom: '40px' }}>
-        <StatCard title="Integrity Score" value={`${data.health_score}%`} icon={<CheckCircle color="#10b981"/>} />
-        <StatCard title="Active Files" value={data.files.length} icon={<FileText color="#3b82f6"/>} />
-        <StatCard title="Total Heals" value={data.repair_total} icon={<Activity color="#8b5cf6"/>} />
-        <StatCard title="System Status" value={data.health_score < 100 ? "DEGRADED" : "OPERATIONAL"} color={data.health_score < 100 ? "#ef4444" : "#10b981"} />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '30px' }}>
-        <div className="glass-card">
-          <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <FileText size={20} color="#10b981"/> File Registry
-          </h3>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ color: '#71717a', fontSize: '0.85rem', borderBottom: '1px solid #27272a' }}>
-                  <th style={{ padding: '12px 10px' }}>IDENTIFIER</th>
-                  <th style={{ padding: '12px 10px' }}>STATUS</th>
-                  <th style={{ padding: '12px 10px' }}>INTEGRITY HASH</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.files.map((f, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #18181b' }}>
-                    <td style={{ padding: '16px 10px', fontSize: '0.95rem', fontWeight: '500' }}>{f.file}</td>
-                    <td style={{ padding: '16px 10px' }}>
-                      <span className={`badge badge-${f.status}`}>{f.status.toUpperCase()}</span>
-                    </td>
-                    <td style={{ padding: '16px 10px', color: '#71717a', fontSize: '0.85rem', fontFamily: 'monospace' }}>{f.hash?.substring(0, 14)}...</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="glass-card">
-          <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <History size={20} color="#8b5cf6"/> Recent Incidents
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-            {data.logs.slice(0, 5).map((log, i) => (
-              <div key={i} style={{ borderLeft: `2px solid ${log.severity === 'HIGH' ? '#ef4444' : '#27272a'}`, paddingLeft: '20px' }}>
-                <div style={{ fontSize: '0.75rem', color: '#71717a' }}>{log.timestamp}</div>
-                <div style={{ fontSize: '0.9rem', marginTop: '4px' }}>{log.event}: {log.action}</div>
-              </div>
-            ))}
-            {data.logs.length === 0 && <p style={{color: '#3f3f46'}}>No recent activity.</p>}
-          </div>
-        </div>
-      </div>
-    </>
-  );
-
-  const renderNodes = () => (
-    <div className="glass-card">
-      <h3 style={{ marginTop: 0, marginBottom: '10px' }}><Globe size={20} color="#3b82f6"/> GCP Distributed Clusters</h3>
-      <p style={{ color: '#71717a', marginBottom: '30px', fontSize: '0.9rem' }}>Real-time status of storage shards across global regions.</p>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-        <NodeCard title="GCP-US-CENTRAL-1" region="Iowa, USA" status="PRIMARY" lat="14ms" load="24%" />
-        <NodeCard title="GCP-EUROPE-WEST-4" region="Netherlands" status="MIRROR" lat="82ms" load="12%" />
-        <NodeCard title="GCP-ASIA-SOUTH-1" region="Mumbai, India" status="REPLICA" lat="124ms" load="8%" />
-        <NodeCard title="SENTINEL-HEAL-COMPUTE" region="Global Edge" status="ACTIVE" lat="2ms" load="42%" />
-      </div>
-    </div>
-  );
-
-  const renderLogs = () => (
-    <div className="glass-card">
-      <h3 style={{ marginTop: 0, marginBottom: '10px' }}><Database size={20} color="#8b5cf6"/> Full System Audit Log</h3>
-      <p style={{ color: '#71717a', marginBottom: '20px', fontSize: '0.9rem' }}>Immutable record of integrity scans and autonomous repairs.</p>
-      
-      <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ color: '#71717a', fontSize: '0.85rem', borderBottom: '1px solid #27272a' }}>
-              <th style={{ padding: '12px' }}>TIMESTAMP</th>
-              <th style={{ padding: '12px' }}>EVENT TYPE</th>
-              <th style={{ padding: '12px' }}>ACTION TAKEN</th>
-              <th style={{ padding: '12px' }}>SEVERITY</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.logs.map((log, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid #18181b', fontSize: '0.9rem' }}>
-                <td style={{ padding: '14px 12px', color: '#71717a' }}>{log.timestamp}</td>
-                <td style={{ padding: '14px 12px', fontWeight: 'bold' }}>{log.event}</td>
-                <td style={{ padding: '14px 12px' }}>{log.action}</td>
-                <td style={{ padding: '14px 12px' }}>
-                    <span style={{ 
-                        color: log.severity === 'HIGH' ? '#ef4444' : '#10b981',
-                        fontSize: '0.75rem', fontWeight: 'bold'
-                    }}>
-                        ● {log.severity || 'INFO'}
-                    </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#09090b', color: '#fafafa' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#09090b', color: '#fafafa', fontFamily: '"Inter", sans-serif' }}>
       
       <style jsx global>{`
-        * { box-sizing: border-box; }
-        .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981; animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; border: 1px solid; }
-        .badge-healthy { background: #064e3b33; color: #34d399; border-color: #064e3b; }
-        .badge-repaired { background: #1e3a8a33; color: #60a5fa; border-color: #1e3a8a; }
-        .badge-corrupted { background: #7f1d1d33; color: #f87171; border-color: #7f1d1d; }
-      `}</style>
+        
+        .pulse-dot {
+          width: 8px; height: 8px; border-radius: 50%;
+          background: #10b981;
+          box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+          animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+          0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+          70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
 
+        .glass-card {
+          background: #111113;
+          border: 1px solid #27272a;
+          border-radius: 16px;
+          padding: 24px;
+        }
+
+        .badge {
+          padding: 4px 12px;
+          border-radius: 99px;
+          font-size: 0.7rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          border: 1px solid transparent;
+        }
+        .healthy { background: #064e3b33; color: #34d399; border: 1px solid #064e3b; }
+        .repaired { background: #1e3a8a33; color: #60a5fa; border: 1px solid #1e3a8a; }
+        .at_risk { background: #7f1d1d33; color: #f87171; border: 1px solid #7f1d1d; }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
+      `}</style>
+      
       {/* SIDEBAR */}
       <aside style={{ 
-        width: '260px', borderRight: '1px solid #27272a', padding: '30px', 
-        display: 'flex', flexDirection: 'column', position: 'fixed', 
-        top: 0, bottom: 0, left: 0, zIndex: 100, backgroundColor: '#09090b', boxSizing: 'border-box' 
+        width: '280px', borderRight: '1px solid #27272a', padding: '40px 30px', 
+        position: 'fixed', height: '100vh', backgroundColor: '#09090b', zIndex: 100 
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#10b981', marginBottom: '40px' }}>
-          <Shield size={28} />
-          <span style={{ fontWeight: '800', fontSize: '1.2rem', letterSpacing: '-0.05em' }}>SENTINEL v1.0</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#10b981', marginBottom: '50px' }}>
+          <Shield size={32} fill="#10b98122" />
+          <span style={{ fontWeight: '800', fontSize: '1.5rem', letterSpacing: '-0.05em' }}>SENTINEL v1.0</span>
         </div>
         
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-          <NavBtn label="Overview" icon={<Activity size={18}/>} active={activeTab === 'Overview'} onClick={() => setActiveTab('Overview')} />
-          <NavBtn label="Storage Nodes" icon={<Server size={18}/>} active={activeTab === 'Nodes'} onClick={() => setActiveTab('Nodes')} />
-          <NavBtn label="Security Logs" icon={<History size={18}/>} active={activeTab === 'Logs'} onClick={() => setActiveTab('Logs')} />
+          <NavBtn label="Overview" icon={<Activity size={20}/>} active={activeTab === 'Overview'} onClick={() => setActiveTab('Overview')} />
+          <NavBtn label="Storage Nodes" icon={<Server size={20}/>} active={activeTab === 'Nodes'} onClick={() => setActiveTab('Nodes')} />
+          <NavBtn label="Security Logs" icon={<History size={20}/>} active={activeTab === 'Logs'} onClick={() => setActiveTab('Logs')} />
         </nav>
 
-        <div style={{ padding: '15px', background: '#18181b', borderRadius: '12px', border: '1px solid #27272a' }}>
-          <div style={{ fontSize: '0.7rem', color: '#71717a', marginBottom: '5px' }}>CLOUD STATUS</div>
-          <div style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ marginTop: 'auto', padding: '20px', background: '#18181b', borderRadius: '12px', border: '1px solid #27272a' }}>
+          <div style={{ fontSize: '0.65rem', color: '#71717a', fontWeight: 'bold', marginBottom: '8px', letterSpacing: '1px' }}>SYSTEM PULSE</div>
+          <div style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '600' }}>
             <div className="pulse-dot"></div>
             GCP-US-CENTRAL
           </div>
@@ -185,64 +123,145 @@ export default function Home() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main style={{ marginLeft: '260px', flex: 1, padding: '50px', boxSizing: 'border-box', width: 'calc(100% - 260px)' }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '40px' }}>
+      <main style={{ marginLeft: '280px', flex: 1, padding: '60px 60px', width: 'calc(100% - 280px)' }}>
+        
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '50px' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: '800' }}>{activeTab === 'Overview' ? 'Infrastructure Health' : activeTab === 'Nodes' ? 'Storage Nodes' : 'Audit Logs'}</h1>
-            <p style={{ color: '#a1a1aa', marginTop: '8px' }}>{activeTab === 'Overview' ? 'Automated integrity enforcement active.' : 'Viewing system-wide cluster data.'}</p>
+            <h1 style={{ fontSize: '2.4rem', fontWeight: '800', letterSpacing: '-0.02em' }}>{activeTab}</h1>
+            <p style={{ color: '#a1a1aa', marginTop: '6px', fontSize: '1.1rem' }}>GCP-powered autonomous integrity enforcement.</p>
           </div>
-          <button 
-            onClick={triggerScan} disabled={scanning} 
-            style={{
-                background: '#fafafa', color: 'black', border: 'none', padding: '12px 24px', 
-                borderRadius: '8px', fontWeight: '700', cursor: 'pointer', display: 'flex', 
-                alignItems: 'center', gap: '10px', transition: '0.2s'
-            }}
-          >
-            <RefreshCw size={18} className={scanning ? 'spin' : ''} /> 
-            {scanning ? 'AUDITING...' : 'Run Global Audit'}
+          <button onClick={triggerScan} disabled={scanning} style={scanBtnStyle}>
+            <RefreshCw size={20} className={scanning ? 'spin' : ''} /> {scanning ? 'SCANNING...' : 'Run Global Audit'}
           </button>
         </header>
 
-        {activeTab === 'Overview' && renderOverview()}
-        {activeTab === 'Nodes' && renderNodes()}
-        {activeTab === 'Logs' && renderLogs()}
+        {activeTab === 'Overview' && (
+          <>
+            {/* AI ANALYST */}
+            <div style={{ 
+              background: 'linear-gradient(90deg, #064e3b22 0%, #022c2233 100%)', 
+              border: '1px solid #064e3b', padding: '24px', borderRadius: '16px', 
+              marginBottom: '40px', display: 'flex', gap: '20px', alignItems: 'center' 
+            }}>
+              <div style={{ background: '#10b98122', padding: '12px', borderRadius: '12px' }}>
+                <Cpu color="#10b981" size={28} />
+              </div>
+              <div>
+                <span style={{ color: '#10b981', fontSize: '0.75rem', fontWeight: '900', letterSpacing: '0.1em' }}>AI SECURITY ANALYST</span>
+                <p style={{ fontStyle: 'italic', color: '#e2e2e2', marginTop: '4px', fontSize: '1.05rem' }}>"{data.insight || "AI Sentinel monitoring system-wide shards..."}"</p>
+              </div>
+            </div>
+
+            {/* STATS */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', marginBottom: '40px' }}>
+              <StatCard title="Integrity Score" value={data.health_score + "%"} icon={<ShieldCheck size={24} color="#10b981"/>} />
+              <StatCard title="Monitored Files" value={data.files.length} icon={<FileText size={24} color="#3b82f6"/>} />
+              <StatCard title="Total Heals" value={data.repair_total} icon={<RefreshCw size={24} color="#8b5cf6"/>} />
+              <StatCard title="Threat Level" value={data.health_score < 100 ? "HIGH" : "MINIMAL"} color={data.health_score < 100 ? "#ef4444" : "#10b981"} icon={<AlertCircle size={24} color={data.health_score < 100 ? "#ef4444" : "#10b981"}/>} />
+            </div>
+
+            {/* FILE REGISTRY TABLE */}
+            <div className="glass-card">
+              <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Database size={20} color="#10b981" /> File Registry
+              </h3>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ color: '#71717a', fontSize: '0.8rem', borderBottom: '1px solid #27272a' }}>
+                    <th style={{ padding: '0 15px 15px 15px' }}>IDENTIFIER</th>
+                    <th style={{ padding: '0 15px 15px 15px' }}>STATUS</th>
+                    <th style={{ padding: '0 15px 15px 15px' }}>SHA-256 HASH</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.files.map((f, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #18181b' }}>
+                      <td style={{ padding: '20px 15px', fontWeight: '600' }}>{f.file}</td>
+                      <td style={{ padding: '20px 15px' }}>
+                        <span className={`badge ${f.status === 'at_risk' ? 'at_risk' : f.status === 'repaired' ? 'repaired' : 'healthy'}`}>
+                          {f.status?.replace('_', ' ').toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ padding: '20px 15px', color: '#71717a', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                        {f.hash?.substring(0, 16)}...
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'Nodes' && (
+           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
+             <NodeCard name="GCP-US-CENTRAL" region="Iowa, USA" load="24%" status="Primary" lat="12ms" />
+             <NodeCard name="GCP-EUROPE-WEST" region="Belgium" load="12%" status="Mirror" lat="84ms" />
+             <NodeCard name="GCP-ASIA-SOUTH" region="Mumbai, India" load="8%" status="Standby" lat="122ms" />
+           </div>
+        )}
+
+        {activeTab === 'Logs' && (
+           <div className="glass-card">
+             <h3 style={{marginBottom: '25px'}}>Global Audit Ledger</h3>
+             <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                {data.logs.map((l, i) => (
+                <div key={i} style={{ padding: '18px 0', borderBottom: '1px solid #18181b', fontSize: '0.95rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                      <div style={{ color: l.severity === 'HIGH' ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>[{l.timestamp}]</div>
+                      <div>{l.event} - {l.action}</div>
+                    </div>
+                    <span style={{ color: '#71717a', fontSize: '0.85rem' }}>{l.file}</span>
+                </div>
+                ))}
+             </div>
+           </div>
+        )}
       </main>
     </div>
   );
 }
 
-// --- SUB-COMPONENTS ---
-
 const NavBtn = ({ label, icon, active, onClick }) => (
-  <div onClick={onClick} style={{ 
-    display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '8px', 
-    cursor: 'pointer', transition: '0.2s', fontSize: '0.95rem',
-    backgroundColor: active ? '#18181b' : 'transparent', color: active ? 'white' : '#71717a'
-  }}> {icon} {label} </div>
+  <button onClick={onClick} style={{ 
+    display: 'flex', alignItems: 'center', gap: '15px', padding: '14px 20px', borderRadius: '12px', 
+    cursor: 'pointer', border: 'none', width: '100%', textAlign: 'left', transition: '0.2s',
+    backgroundColor: active ? '#18181b' : 'transparent', 
+    color: active ? '#fff' : '#71717a',
+    fontWeight: active ? '600' : '400'
+  }}> {icon} {label} </button>
 );
 
 const StatCard = ({ title, value, icon, color }) => (
-  <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#111113', padding: '24px', borderRadius: '16px', border: '1px solid #27272a' }}>
-    <div>
-      <div style={{ color: '#71717a', fontSize: '0.85rem', marginBottom: '8px' }}>{title}</div>
-      <div style={{ fontSize: '1.8rem', fontWeight: '800', color: color || 'white' }}>{value}</div>
+  <div className="glass-card" style={{ position: 'relative', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', zIndex: 1 }}>
+      <div style={{ color: '#71717a', fontSize: '0.8rem', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' }}>{title}</div>
+      <div style={{ fontSize: '2rem', fontWeight: '800', color: color || 'white' }}>{value}</div>
     </div>
-    <div style={{ padding: '10px', background: '#18181b', borderRadius: '10px' }}>{icon}</div>
+    <div style={{ position: 'absolute', right: '-10px', bottom: '-10px', opacity: 0.05, transform: 'scale(2.5)' }}>
+      {icon}
+    </div>
   </div>
 );
 
-const NodeCard = ({ title, region, status, lat, load }) => (
-    <div style={{ padding: '25px', border: '1px solid #27272a', borderRadius: '16px', background: '#111113' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-            <strong style={{ fontSize: '1.1rem' }}>{title}</strong>
-            <Server size={18} color="#71717a" />
+const NodeCard = ({ name, region, load, status, lat }) => (
+  <div className="glass-card">
+    <div style={{display:'flex', justifyContent:'space-between', alignItems:'start', marginBottom: '20px'}}>
+        <div>
+            <div style={{ fontWeight: '800', fontSize:'1.1rem' }}>{name}</div>
+            <div style={{ fontSize: '0.85rem', color: '#71717a', marginTop: '4px' }}>{region}</div>
         </div>
-        <div style={{ fontSize: '0.85rem', color: '#a1a1aa', marginBottom: '5px' }}>Location: {region}</div>
-        <div style={{ fontSize: '0.85rem', color: '#10b981', marginBottom: '15px' }}>● {status}</div>
-        <div style={{ display: 'flex', gap: '15px', borderTop: '1px solid #27272a', paddingTop: '15px' }}>
-            <div><small style={{ color: '#71717a' }}>LATENCY</small><br/>{lat}</div>
-            <div><small style={{ color: '#71717a' }}>CURR. LOAD</small><br/>{load}</div>
-        </div>
+        <span style={{fontSize:'0.7rem', fontWeight:'900', color:'#10b981', background:'#10b98111', padding:'6px 12px', borderRadius:'8px', border: '1px solid #10b98144'}}>{status}</span>
     </div>
+    <div style={{ display:'flex', justifyContent:'space-between', borderTop:'1px solid #27272a', paddingTop:'20px' }}>
+        <div><small style={{color:'#71717a', display:'block', marginBottom: '4px', fontWeight: '700'}}>LATENCY</small><span style={{fontWeight: '700'}}>{lat}</span></div>
+        <div style={{textAlign: 'right'}}><small style={{color:'#71717a', display:'block', marginBottom: '4px', fontWeight: '700'}}>LOAD</small><span style={{fontWeight: '700'}}>{load}</span></div>
+    </div>
+  </div>
 );
+
+const scanBtnStyle = { 
+  background: '#fafafa', color: '#000', border: 'none', padding: '14px 28px', 
+  borderRadius: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', 
+  alignItems: 'center', gap: '12px', transition: '0.2s'
+};
